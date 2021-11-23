@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
 from .models import MyUser
+from .utils import send_activation_sms
 
 
-class Registerserializer(serializers.ModelSerializer):
+class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(min_length=8, write_only=True, required=True)
     password_confirmation = serializers.CharField(min_length=8, write_only=True, required=True)
 
@@ -25,4 +26,5 @@ class Registerserializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = MyUser.objects.create_user(**validated_data)
-        send_activation_sms()
+        send_activation_sms(str(user.phone_number), user.activation_code)
+        return user

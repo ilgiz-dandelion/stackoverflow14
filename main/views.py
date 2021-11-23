@@ -1,7 +1,11 @@
+from django.db.models import Q
 from django.shortcuts import render
+from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView, CreateAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
+from .permissions import IsAuthorPermission
 from .models import *
 from .serializers import CodeImageSerializer, ProblemSerializer, ReplySerializer, CommentSerializer
 
@@ -28,7 +32,18 @@ from .serializers import CodeImageSerializer, ProblemSerializer, ReplySerializer
 #         context['request'] = self.request
 #         return context
 
-class ProblemViewSet(ModelViewSet):
+
+class PermissionMixin:
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update', 'destroy']:
+            permissions = [IsAuthorPermission, ]
+        elif self.action == 'create':
+            permissions = [IsAuthenticated, ]
+        else:
+            permissions = []
+        return [permission() for permission in permissions]
+
+class ProblemViewSet(PermissionMixin, ModelViewSet):
     queryset = Problem.objects.all()
     serializer_class = ProblemSerializer
 
@@ -37,12 +52,21 @@ class ProblemViewSet(ModelViewSet):
         context['action'] = self.action
         return context
 
+    @action(methods=['GET'], detail=False)
+    def search(self, request):
+        query = request.query_params.get('q')
+        queryset = self.get_queryset().filter(
+            Q(title__icontains=query) | Q(description__icontains=query)
+        )
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
-class ReplyViewSet(ModelViewSet):
+
+class ReplyViewSet(PermissionMixin, ModelViewSet):
     queryset = Reply.objects.all()
     serializer_class = ReplySerializer
 
 
-class CommentViewSet(ModelViewSet):
+class CommentViewSet(PermissionMixin, ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
